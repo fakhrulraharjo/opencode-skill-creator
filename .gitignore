@@ -18,6 +18,9 @@
 tmp/
 *.tmp
 
+# Package manager installs
+plugin/node_modules/
+
 # Marketing skills (project-level only)
 .opencode/
 .agents/
