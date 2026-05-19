@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 
 const pluginSourcePath = fileURLToPath(new URL("../skill-creator.ts", import.meta.url))
+const runtimeEntryPath = fileURLToPath(new URL("../runtime-entry.ts", import.meta.url))
 const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url))
 const pluginRoot = fileURLToPath(new URL("..", import.meta.url))
 const distEntryPath = fileURLToPath(new URL("../dist/skill-creator.js", import.meta.url))
@@ -37,7 +38,7 @@ function listSourceFiles(dir) {
 }
 
 function hashPluginSources() {
-  const files = [pluginSourcePath, ...listSourceFiles(join(pluginRoot, "lib"))].sort()
+  const files = [runtimeEntryPath, pluginSourcePath, ...listSourceFiles(join(pluginRoot, "lib"))].sort()
   const hash = createHash("sha256")
   for (const file of files) {
     hash.update(relative(pluginRoot, file))
@@ -86,6 +87,13 @@ test("bundled skill uses the opencode-specific skill name", () => {
 test("compiled entrypoint imports as a plugin function", async () => {
   const mod = await import(distEntryPath)
 
+  assert.equal(typeof mod.default, "function")
+})
+
+test("compiled entrypoint only exposes plugin functions for legacy OpenCode loaders", async () => {
+  const mod = await import(distEntryPath)
+
+  assert.deepEqual(Object.keys(mod), ["default"])
   assert.equal(typeof mod.default, "function")
 })
 
@@ -159,6 +167,7 @@ test("compiled artifact manifest matches current TypeScript sources", () => {
   const manifest = JSON.parse(readFileSync(buildManifestPath, "utf-8"))
 
   assert.equal(manifest.entrypoint, "skill-creator.ts")
+  assert.equal(manifest.runtimeEntrypoint, "runtime-entry.ts")
   assert.equal(manifest.sourceHash, hashPluginSources())
   assert.equal(typeof manifest.builtAt, "string")
   assert.equal(Number.isNaN(Date.parse(manifest.builtAt)), false)
