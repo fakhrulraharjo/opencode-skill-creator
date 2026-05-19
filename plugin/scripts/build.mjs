@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url"
 
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const distRoot = resolve(pluginRoot, "dist")
+const runtimeEntry = "runtime-entry.ts"
 
 function listSourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -24,6 +25,7 @@ function listSourceFiles(dir) {
 
 function hashPluginSources() {
   const files = [
+    resolve(pluginRoot, runtimeEntry),
     resolve(pluginRoot, "skill-creator.ts"),
     ...listSourceFiles(resolve(pluginRoot, "lib")),
   ].sort()
@@ -49,7 +51,7 @@ execFileSync(
   "bun",
   [
     "build",
-    "./skill-creator.ts",
+    `./${runtimeEntry}`,
     "--target=bun",
     "--format=esm",
     "--outfile=dist/skill-creator.js",
@@ -68,6 +70,7 @@ writeFileSync(
   `${JSON.stringify(
     {
       entrypoint: "skill-creator.ts",
+      runtimeEntrypoint: runtimeEntry,
       sourceHash: hashPluginSources(),
       builtAt: new Date().toISOString(),
     },
