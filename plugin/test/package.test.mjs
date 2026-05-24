@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
+import { createConnection } from "node:net"
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -95,6 +97,159 @@ test("compiled entrypoint only exposes plugin functions for legacy OpenCode load
 
   assert.deepEqual(Object.keys(mod), ["default"])
   assert.equal(typeof mod.default, "function")
+})
+
+test("compiled review server runs in Node without a Bun runtime global", async () => {
+  assert.equal(globalThis.Bun, undefined)
+
+  const tempHome = mkdtempSync(join(tmpdir(), "osc-review-server-"))
+  const workspace = join(tempHome, "workspace")
+  const fakeBin = join(tempHome, "bin")
+  const previousXdgConfigHome = process.env.XDG_CONFIG_HOME
+  const previousPath = process.env.PATH
+
+  try {
+    const outputsDir = join(workspace, "eval-0", "with_skill", "outputs")
+    mkdirSync(outputsDir, { recursive: true })
+    mkdirSync(fakeBin, { recursive: true })
+    writeFileSync(
+      join(workspace, "eval-0", "eval_metadata.json"),
+      `${JSON.stringify({ eval_id: 0, prompt: "Review this output" })}\n`,
+    )
+    const benchmarkPath = join(workspace, "benchmark.json")
+    writeFileSync(
+      benchmarkPath,
+      `${JSON.stringify({ summary: { total_evals: 1, pass_rate: 1 } })}\n`,
+    )
+    writeFileSync(join(outputsDir, "result.txt"), "ok\n")
+    writeFileSync(join(fakeBin, "open"), "#!/bin/sh\nexit 0\n")
+    chmodSync(join(fakeBin, "open"), 0o755)
+
+    process.env.XDG_CONFIG_HOME = tempHome
+    process.env.PATH = previousPath ? `${fakeBin}:${previousPath}` : fakeBin
+
+    const mod = await import(`${distEntryPath}?review-node=${Date.now()}`)
+    const hooks = await mod.default({})
+    const result = JSON.parse(
+      await hooks.tool.skill_serve_review.execute({
+        workspace,
+        port: 0,
+        skillName: "test-skill",
+        benchmarkPath,
+        allowPartial: true,
+      }),
+    )
+
+    try {
+      const response = await fetch(result.url)
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      assert.match(html, /test-skill/)
+      assert.match(html, /ok/)
+      assert.match(html, /total_evals/)
+
+      const feedback = {
+        status: "complete",
+        reviews: [
+          {
+            run_id: "eval-0-with_skill",
+            feedback: "works",
+            timestamp: "2026-05-24T00:00:00.000Z",
+          },
+        ],
+      }
+      const feedbackResponse = await fetch(`${result.url}/api/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(feedback),
+      })
+      assert.equal(feedbackResponse.status, 200)
+      assert.equal(readFileSync(result.feedbackPath, "utf-8"), `${JSON.stringify(feedback, null, 2)}\n`)
+
+      const oversizedResponse = await fetch(`${result.url}/api/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reviews: [
+            {
+              run_id: "eval-0-with_skill",
+              feedback: "x".repeat(1_100_000),
+            },
+          ],
+        }),
+      })
+      assert.equal(oversizedResponse.status, 413)
+    } finally {
+      await hooks.tool.skill_stop_review.execute({ workspace })
+    }
+  } finally {
+    if (previousXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = previousXdgConfigHome
+    }
+    if (previousPath === undefined) {
+      delete process.env.PATH
+    } else {
+      process.env.PATH = previousPath
+    }
+    rmSync(tempHome, { recursive: true, force: true })
+  }
+})
+
+test("compiled review server stop closes active browser connections", async () => {
+  const tempHome = mkdtempSync(join(tmpdir(), "osc-review-stop-"))
+  const workspace = join(tempHome, "workspace")
+  const previousXdgConfigHome = process.env.XDG_CONFIG_HOME
+  let socket
+  let stopPromise
+
+  try {
+    const outputsDir = join(workspace, "eval-0", "with_skill", "outputs")
+    mkdirSync(outputsDir, { recursive: true })
+    writeFileSync(
+      join(workspace, "eval-0", "eval_metadata.json"),
+      `${JSON.stringify({ eval_id: 0, prompt: "Review this output" })}\n`,
+    )
+    writeFileSync(join(outputsDir, "result.txt"), "ok\n")
+
+    process.env.XDG_CONFIG_HOME = tempHome
+
+    const mod = await import(`${distEntryPath}?review-stop=${Date.now()}`)
+    const hooks = await mod.default({})
+    const result = JSON.parse(
+      await hooks.tool.skill_serve_review.execute({
+        workspace,
+        port: 0,
+        skillName: "test-skill",
+        allowPartial: true,
+      }),
+    )
+    const url = new URL(result.url)
+
+    socket = await new Promise((resolve, reject) => {
+      const client = createConnection(Number(url.port), url.hostname, () => resolve(client))
+      client.on("error", reject)
+    })
+    socket.write("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n")
+
+    stopPromise = hooks.tool.skill_stop_review.execute({ workspace })
+    await Promise.race([
+      stopPromise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Timed out waiting for review server to stop")), 500)
+      }),
+    ])
+  } finally {
+    socket?.destroy()
+    if (stopPromise) await stopPromise.catch(() => {})
+    if (previousXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = previousXdgConfigHome
+    }
+    rmSync(tempHome, { recursive: true, force: true })
+  }
 })
 
 test("compiled plugin startup installs renamed skill and archives plugin-owned legacy skill", async () => {
