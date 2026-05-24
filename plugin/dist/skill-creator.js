@@ -14338,7 +14338,10 @@ function listen(server, port) {
     });
   });
 }
-function closeServer(server) {
+function closeServer(server, sockets) {
+  for (const socket of sockets) {
+    socket.destroy();
+  }
   return new Promise((resolve, reject) => {
     server.close((error45) => {
       if (error45)
@@ -14379,6 +14382,13 @@ async function serveReview(opts) {
   const server = createServer((req, res) => {
     handleNodeRequest(req, res, context);
   });
+  const sockets = new Set;
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => {
+      sockets.delete(socket);
+    });
+  });
   await listen(server, port);
   const address = server.address();
   const actualPort = address.port;
@@ -14396,7 +14406,7 @@ async function serveReview(opts) {
     server,
     url: serverUrl,
     feedbackPath,
-    stop: () => closeServer(server)
+    stop: () => closeServer(server, sockets)
   };
 }
 function exportStaticReview(opts) {

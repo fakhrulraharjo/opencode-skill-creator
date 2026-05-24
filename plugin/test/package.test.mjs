@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
+import { createConnection } from "node:net"
 import {
   chmodSync,
   existsSync,
@@ -177,6 +178,61 @@ test("compiled review server runs in Node without a Bun runtime global", async (
       delete process.env.PATH
     } else {
       process.env.PATH = previousPath
+    }
+    rmSync(tempHome, { recursive: true, force: true })
+  }
+})
+
+test("compiled review server stop closes active browser connections", async () => {
+  const tempHome = mkdtempSync(join(tmpdir(), "osc-review-stop-"))
+  const workspace = join(tempHome, "workspace")
+  const previousXdgConfigHome = process.env.XDG_CONFIG_HOME
+  let socket
+  let stopPromise
+
+  try {
+    const outputsDir = join(workspace, "eval-0", "with_skill", "outputs")
+    mkdirSync(outputsDir, { recursive: true })
+    writeFileSync(
+      join(workspace, "eval-0", "eval_metadata.json"),
+      `${JSON.stringify({ eval_id: 0, prompt: "Review this output" })}\n`,
+    )
+    writeFileSync(join(outputsDir, "result.txt"), "ok\n")
+
+    process.env.XDG_CONFIG_HOME = tempHome
+
+    const mod = await import(`${distEntryPath}?review-stop=${Date.now()}`)
+    const hooks = await mod.default({})
+    const result = JSON.parse(
+      await hooks.tool.skill_serve_review.execute({
+        workspace,
+        port: 0,
+        skillName: "test-skill",
+        allowPartial: true,
+      }),
+    )
+    const url = new URL(result.url)
+
+    socket = await new Promise((resolve, reject) => {
+      const client = createConnection(Number(url.port), url.hostname, () => resolve(client))
+      client.on("error", reject)
+    })
+    socket.write("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n")
+
+    stopPromise = hooks.tool.skill_stop_review.execute({ workspace })
+    await Promise.race([
+      stopPromise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Timed out waiting for review server to stop")), 500)
+      }),
+    ])
+  } finally {
+    socket?.destroy()
+    if (stopPromise) await stopPromise.catch(() => {})
+    if (previousXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = previousXdgConfigHome
     }
     rmSync(tempHome, { recursive: true, force: true })
   }

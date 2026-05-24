@@ -21,6 +21,7 @@ import {
 } from "fs"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import type { AddressInfo } from "node:net"
+import type { Socket } from "node:net"
 import { basename, extname, join, relative } from "path"
 
 // ---------------------------------------------------------------------------
@@ -572,7 +573,11 @@ function listen(server: Server, port: number): Promise<void> {
   })
 }
 
-function closeServer(server: Server): Promise<void> {
+function closeServer(server: Server, sockets: Set<Socket>): Promise<void> {
+  for (const socket of sockets) {
+    socket.destroy()
+  }
+
   return new Promise((resolve, reject) => {
     server.close((error) => {
       if (error) reject(error)
@@ -644,6 +649,13 @@ export async function serveReview(opts: ServeReviewOptions): Promise<{
   const server = createServer((req, res) => {
     void handleNodeRequest(req, res, context)
   })
+  const sockets = new Set<Socket>()
+  server.on("connection", (socket) => {
+    sockets.add(socket)
+    socket.on("close", () => {
+      sockets.delete(socket)
+    })
+  })
   await listen(server, port)
 
   const address = server.address() as AddressInfo
@@ -667,7 +679,7 @@ export async function serveReview(opts: ServeReviewOptions): Promise<{
     server,
     url: serverUrl,
     feedbackPath,
-    stop: () => closeServer(server),
+    stop: () => closeServer(server, sockets),
   }
 }
 
