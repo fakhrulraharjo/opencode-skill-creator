@@ -14338,6 +14338,16 @@ function listen(server, port) {
     });
   });
 }
+function closeServer(server) {
+  return new Promise((resolve, reject) => {
+    server.close((error45) => {
+      if (error45)
+        reject(error45);
+      else
+        resolve();
+    });
+  });
+}
 async function serveReview(opts) {
   const {
     workspace,
@@ -14386,7 +14396,7 @@ async function serveReview(opts) {
     server,
     url: serverUrl,
     feedbackPath,
-    stop: () => server.close()
+    stop: () => closeServer(server)
   };
 }
 function exportStaticReview(opts) {
@@ -15101,7 +15111,7 @@ var SkillCreatorPlugin = async (ctx) => {
           const prep = prepareReviewLaunch(args);
           const existing = activeServers.get(args.workspace);
           if (existing) {
-            existing.stop();
+            await existing.stop();
             activeServers.delete(args.workspace);
           }
           const templatePath = join10(TEMPLATES_DIR, "viewer.html");
@@ -15139,7 +15149,7 @@ var SkillCreatorPlugin = async (ctx) => {
           if (args.workspace) {
             const srv = activeServers.get(args.workspace);
             if (srv) {
-              srv.stop();
+              await srv.stop();
               activeServers.delete(args.workspace);
               return JSON.stringify({ stopped: args.workspace });
             }
@@ -15147,7 +15157,7 @@ var SkillCreatorPlugin = async (ctx) => {
           }
           const stopped = [];
           for (const [ws, srv] of activeServers) {
-            srv.stop();
+            await srv.stop();
             stopped.push(ws);
           }
           activeServers.clear();

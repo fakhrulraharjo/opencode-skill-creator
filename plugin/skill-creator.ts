@@ -323,7 +323,7 @@ export async function maybeAutoRefreshPluginCache(
 // Track running review servers so they can be stopped
 // ---------------------------------------------------------------------------
 
-const activeServers: Map<string, { stop: () => void; url: string }> = new Map()
+const activeServers: Map<string, { stop: () => Promise<void>; url: string }> = new Map()
 
 // ---------------------------------------------------------------------------
 // Plugin export
@@ -786,7 +786,7 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
           // Stop any existing server for this workspace
           const existing = activeServers.get(args.workspace)
           if (existing) {
-            existing.stop()
+            await existing.stop()
             activeServers.delete(args.workspace)
           }
 
@@ -835,7 +835,7 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
           if (args.workspace) {
             const srv = activeServers.get(args.workspace)
             if (srv) {
-              srv.stop()
+              await srv.stop()
               activeServers.delete(args.workspace)
               return JSON.stringify({ stopped: args.workspace })
             }
@@ -845,7 +845,7 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
           // Stop all
           const stopped: string[] = []
           for (const [ws, srv] of activeServers) {
-            srv.stop()
+            await srv.stop()
             stopped.push(ws)
           }
           activeServers.clear()

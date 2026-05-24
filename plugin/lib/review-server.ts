@@ -572,6 +572,15 @@ function listen(server: Server, port: number): Promise<void> {
   })
 }
 
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
@@ -596,7 +605,7 @@ export async function serveReview(opts: ServeReviewOptions): Promise<{
   server: Server
   url: string
   feedbackPath: string
-  stop: () => void
+  stop: () => Promise<void>
 }> {
   const {
     workspace,
@@ -658,7 +667,7 @@ export async function serveReview(opts: ServeReviewOptions): Promise<{
     server,
     url: serverUrl,
     feedbackPath,
-    stop: () => server.close(),
+    stop: () => closeServer(server),
   }
 }
 

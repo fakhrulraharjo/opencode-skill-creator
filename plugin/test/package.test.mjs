@@ -115,6 +115,11 @@ test("compiled review server runs in Node without a Bun runtime global", async (
       join(workspace, "eval-0", "eval_metadata.json"),
       `${JSON.stringify({ eval_id: 0, prompt: "Review this output" })}\n`,
     )
+    const benchmarkPath = join(workspace, "benchmark.json")
+    writeFileSync(
+      benchmarkPath,
+      `${JSON.stringify({ summary: { total_evals: 1, pass_rate: 1 } })}\n`,
+    )
     writeFileSync(join(outputsDir, "result.txt"), "ok\n")
     writeFileSync(join(fakeBin, "open"), "#!/bin/sh\nexit 0\n")
     chmodSync(join(fakeBin, "open"), 0o755)
@@ -129,6 +134,7 @@ test("compiled review server runs in Node without a Bun runtime global", async (
         workspace,
         port: 0,
         skillName: "test-skill",
+        benchmarkPath,
         allowPartial: true,
       }),
     )
@@ -139,6 +145,7 @@ test("compiled review server runs in Node without a Bun runtime global", async (
       const html = await response.text()
       assert.match(html, /test-skill/)
       assert.match(html, /ok/)
+      assert.match(html, /total_evals/)
 
       const feedback = {
         status: "complete",
