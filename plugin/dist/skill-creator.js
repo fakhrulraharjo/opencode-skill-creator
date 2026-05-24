@@ -14213,6 +14213,7 @@ class PayloadTooLargeError extends Error {
   constructor() {
     super("Payload too large");
     this.name = "PayloadTooLargeError";
+    Object.setPrototypeOf(this, PayloadTooLargeError.prototype);
   }
 }
 function readStream(stream, maxBytes) {
@@ -14224,12 +14225,13 @@ function readStream(stream, maxBytes) {
     stream.on("data", (chunk) => {
       if (rejected)
         return;
-      bytes += Buffer.byteLength(chunk, "utf-8");
-      if (bytes > maxBytes) {
+      const chunkBytes = Buffer.byteLength(chunk, "utf-8");
+      if (bytes + chunkBytes > maxBytes) {
         rejected = true;
         reject(new PayloadTooLargeError);
         return;
       }
+      bytes += chunkBytes;
       body += chunk;
     });
     stream.on("end", () => {
@@ -14250,15 +14252,16 @@ function runCommand(command, args) {
     proc.stdout?.on("data", (chunk) => {
       text += chunk;
     });
-    proc.on("error", () => resolve(""));
-    proc.on("close", () => resolve(text));
+    proc.on("error", (error45) => resolve({ ok: false, stdout: text, error: error45 }));
+    proc.on("close", (code) => resolve({ ok: code === 0, stdout: text }));
   });
 }
 async function killPort(port) {
   if (!Number.isInteger(port) || port <= 0)
     return;
   try {
-    const text = await runCommand("lsof", ["-ti", `:${port}`]);
+    const result = await runCommand("lsof", ["-ti", `:${port}`]);
+    const text = result.stdout;
     for (const pidStr of text.trim().split(`
 `)) {
       const pid = parseInt(pidStr.trim(), 10);
@@ -14417,6 +14420,9 @@ async function serveReview(opts) {
   });
   await listen(server, port);
   const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Review server did not bind to a TCP port");
+  }
   const actualPort = address.port;
   const serverUrl = `http://localhost:${actualPort}`;
   if (openBrowser) {

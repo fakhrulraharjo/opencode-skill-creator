@@ -393,7 +393,14 @@ class PayloadTooLargeError extends Error {
   constructor() {
     super("Payload too large")
     this.name = "PayloadTooLargeError"
+    Object.setPrototypeOf(this, PayloadTooLargeError.prototype)
   }
+}
+
+interface CommandResult {
+  ok: boolean
+  stdout: string
+  error?: Error
 }
 
 function readStream(stream: IncomingMessage, maxBytes: number): Promise<string> {
@@ -404,12 +411,13 @@ function readStream(stream: IncomingMessage, maxBytes: number): Promise<string> 
     stream.setEncoding("utf-8")
     stream.on("data", (chunk) => {
       if (rejected) return
-      bytes += Buffer.byteLength(chunk, "utf-8")
-      if (bytes > maxBytes) {
+      const chunkBytes = Buffer.byteLength(chunk, "utf-8")
+      if (bytes + chunkBytes > maxBytes) {
         rejected = true
         reject(new PayloadTooLargeError())
         return
       }
+      bytes += chunkBytes
       body += chunk
     })
     stream.on("end", () => {
@@ -419,7 +427,7 @@ function readStream(stream: IncomingMessage, maxBytes: number): Promise<string> 
   })
 }
 
-function runCommand(command: string, args: string[]): Promise<string> {
+function runCommand(command: string, args: string[]): Promise<CommandResult> {
   return new Promise((resolve) => {
     const proc = spawn(command, args, {
       stdout: "pipe",
@@ -431,8 +439,8 @@ function runCommand(command: string, args: string[]): Promise<string> {
     proc.stdout?.on("data", (chunk) => {
       text += chunk
     })
-    proc.on("error", () => resolve(""))
-    proc.on("close", () => resolve(text))
+    proc.on("error", (error) => resolve({ ok: false, stdout: text, error }))
+    proc.on("close", (code) => resolve({ ok: code === 0, stdout: text }))
   })
 }
 
@@ -440,7 +448,8 @@ async function killPort(port: number): Promise<void> {
   if (!Number.isInteger(port) || port <= 0) return
 
   try {
-    const text = await runCommand("lsof", ["-ti", `:${port}`])
+    const result = await runCommand("lsof", ["-ti", `:${port}`])
+    const text = result.stdout
 
     for (const pidStr of text.trim().split("\n")) {
       const pid = parseInt(pidStr.trim(), 10)
@@ -684,8 +693,11 @@ export async function serveReview(opts: ServeReviewOptions): Promise<{
   })
   await listen(server, port)
 
-  const address = server.address() as AddressInfo
-  const actualPort = address.port
+  const address = server.address()
+  if (!address || typeof address === "string") {
+    throw new Error("Review server did not bind to a TCP port")
+  }
+  const actualPort = (address as AddressInfo).port
   const serverUrl = `http://localhost:${actualPort}`
 
   if (openBrowser) {
