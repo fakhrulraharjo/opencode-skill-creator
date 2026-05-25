@@ -12518,6 +12518,9 @@ import { randomBytes } from "crypto";
 
 // lib/process.ts
 import { spawn } from "child_process";
+function isFailedExitCode(exitCode) {
+  return exitCode != null && exitCode !== 0;
+}
 function runProcess(command, opts) {
   return new Promise((resolve, reject) => {
     const [file2, ...args] = command;
@@ -12686,7 +12689,7 @@ async function runSingleQuery(query, skillName, skillDescription, timeout, proje
       }
     });
     flushBuffer(true);
-    if (result.exitCode !== 0) {
+    if (isFailedExitCode(result.exitCode)) {
       const cleanedStderr = result.stderr.trim();
       throw new Error(cleanedStderr ? `opencode run exited ${result.exitCode}: ${cleanedStderr}` : `opencode run exited ${result.exitCode}`);
     }
@@ -12889,7 +12892,7 @@ async function callOpenCode(prompt, model, timeout = 300) {
       }
     });
     flushLines(true);
-    if (result.exitCode !== 0) {
+    if (isFailedExitCode(result.exitCode)) {
       throw new Error(`opencode run exited ${result.exitCode}
 stderr: ${result.stderr}`);
     }

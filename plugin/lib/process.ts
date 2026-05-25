@@ -15,6 +15,10 @@ export interface RunProcessResult {
   timedOut: boolean
 }
 
+export function isFailedExitCode(exitCode: number | null): boolean {
+  return exitCode != null && exitCode !== 0
+}
+
 export function runProcess(command: string[], opts: RunProcessOptions): Promise<RunProcessResult> {
   return new Promise((resolve, reject) => {
     const [file, ...args] = command

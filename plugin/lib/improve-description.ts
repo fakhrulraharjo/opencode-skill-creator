@@ -18,7 +18,7 @@ import {
   classifyEvalFailures,
   formatFailureDiagnostics,
 } from "./failure-taxonomy"
-import { runProcess } from "./process"
+import { isFailedExitCode, runProcess } from "./process"
 import type { EvalOutput, EvalResultItem } from "./run-eval"
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ async function callOpenCode(
 
     flushLines(true)
 
-    if (result.exitCode !== 0) {
+    if (isFailedExitCode(result.exitCode)) {
       throw new Error(`opencode run exited ${result.exitCode}\nstderr: ${result.stderr}`)
     }
 
