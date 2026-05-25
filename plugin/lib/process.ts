@@ -19,6 +19,11 @@ export function isFailedExitCode(exitCode: number | null): boolean {
   return exitCode != null && exitCode !== 0
 }
 
+/**
+ * Spawn a command without a shell, collect stdout/stderr, and optionally stream
+ * stdout chunks to a parser. Rejects only when the process cannot be spawned;
+ * callers decide how to handle exit codes, null exits, and timeouts.
+ */
 export function runProcess(command: string[], opts: RunProcessOptions): Promise<RunProcessResult> {
   return new Promise((resolve, reject) => {
     const [file, ...args] = command
