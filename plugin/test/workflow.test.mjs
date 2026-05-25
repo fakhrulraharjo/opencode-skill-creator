@@ -9,14 +9,20 @@ const publishWorkflowPath = fileURLToPath(
 )
 
 function extractTrustedPublishingVersionCheck(workflow) {
-  const match = workflow.match(/node -e '([^']+)' "\$NPM_VERSION"/)
+  const scriptLine = workflow
+    .split("\n")
+    .find((line) => line.includes("node -e") && line.includes("$NPM_VERSION"))
+  const match = scriptLine?.match(/node -e '([^']+)' "\$NPM_VERSION"/)
   assert.ok(match, "expected npm trusted publishing version check script")
   return match[1]
 }
 
 function runVersionCheck(script, version) {
   try {
-    execFileSync(process.execPath, ["-e", script, version], { stdio: "pipe" })
+    execFileSync(process.execPath, ["-e", script, version], {
+      stdio: "pipe",
+      timeout: 1_000,
+    })
     return { ok: true }
   } catch (error) {
     return { ok: false, stderr: String(error.stderr) }
