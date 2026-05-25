@@ -58,6 +58,8 @@ test("publish workflow rejects incomplete npm versions for trusted publishing", 
   const workflow = readFileSync(publishWorkflowPath, "utf-8")
   const script = extractTrustedPublishingVersionCheck(workflow)
 
+  assert.doesNotMatch(script, /require|import|eval|Function|child_process/)
+
   assert.equal(runVersionCheck(script, "11").ok, false)
   assert.equal(runVersionCheck(script, "11.5").ok, false)
   assert.equal(runVersionCheck(script, "11.5.0").ok, false)
