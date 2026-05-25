@@ -19,6 +19,10 @@ test("publish workflow uses npm trusted publishing provenance", () => {
   const workflow = readFileSync(publishWorkflowPath, "utf-8")
 
   assert.match(workflow, /permissions:\s+contents:\s*write\s+id-token:\s*write/s)
+  assert.match(
+    workflow,
+    /if:\s*steps\.npm\.outputs\.exists != 'true' && github\.repository == 'antongulin\/opencode-skill-creator' && github\.ref == 'refs\/heads\/main'\s+run:\s*npm publish --access public --provenance/s,
+  )
   assert.match(workflow, /run:\s*npm publish --access public --provenance\s+working-directory:\s*plugin/s)
   assert.doesNotMatch(workflow, /NODE_AUTH_TOKEN/)
 })
