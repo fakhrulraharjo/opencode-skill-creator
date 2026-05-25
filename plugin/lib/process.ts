@@ -19,10 +19,15 @@ export function isFailedExitCode(exitCode: number | null): boolean {
   return exitCode != null && exitCode !== 0
 }
 
+export function isFailedProcess(result: RunProcessResult): boolean {
+  return result.timedOut || isFailedExitCode(result.exitCode)
+}
+
 /**
  * Spawn a command without a shell, collect stdout/stderr, and optionally stream
  * stdout chunks to a parser. Rejects only when the process cannot be spawned;
- * callers decide how to handle exit codes, null exits, and timeouts.
+ * callers decide how to handle exit codes and timeouts. Use `timedOut` to
+ * distinguish timeouts from other null-exit process states.
  */
 export function runProcess(command: string[], opts: RunProcessOptions): Promise<RunProcessResult> {
   return new Promise((resolve, reject) => {

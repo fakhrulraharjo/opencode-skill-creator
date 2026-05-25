@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs"
 import { dirname, join, parse } from "path"
 import { randomBytes } from "crypto"
 
-import { isFailedExitCode, runProcess } from "./process"
+import { isFailedProcess, runProcess } from "./process"
 
 const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -206,7 +206,7 @@ async function runSingleQuery(
 
     flushBuffer(true)
 
-    if (isFailedExitCode(result.exitCode)) {
+    if (isFailedProcess(result)) {
       const cleanedStderr = result.stderr.trim()
       throw new Error(
         cleanedStderr

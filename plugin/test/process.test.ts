@@ -1,11 +1,23 @@
 import { expect, test } from "bun:test"
 
-import { isFailedExitCode, runProcess } from "../lib/process"
+import { isFailedExitCode, isFailedProcess, runProcess } from "../lib/process"
 
 test("isFailedExitCode treats only defined non-zero exit codes as failures", () => {
   expect(isFailedExitCode(1)).toBe(true)
   expect(isFailedExitCode(0)).toBe(false)
   expect(isFailedExitCode(null)).toBe(false)
+})
+
+test("isFailedProcess treats timeouts as failures without changing null exit semantics", () => {
+  expect(
+    isFailedProcess({ exitCode: null, stdout: "", stderr: "", timedOut: true }),
+  ).toBe(true)
+  expect(
+    isFailedProcess({ exitCode: null, stdout: "", stderr: "", timedOut: false }),
+  ).toBe(false)
+  expect(
+    isFailedProcess({ exitCode: 1, stdout: "", stderr: "", timedOut: false }),
+  ).toBe(true)
 })
 
 test("runProcess reports timeouts without treating null exits as failures", async () => {
