@@ -12356,7 +12356,7 @@ function isQuotedValue(value) {
   return value.length >= 2 && (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'"));
 }
 function isBlockScalarMarker(value) {
-  return /^[|>][+-]?$/.test(value);
+  return /^[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(value);
 }
 function validateSkill(skillPath) {
   const skillMdPath = join(skillPath, "SKILL.md");

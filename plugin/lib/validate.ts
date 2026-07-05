@@ -32,7 +32,8 @@ function isQuotedValue(value: string): boolean {
 }
 
 function isBlockScalarMarker(value: string): boolean {
-  return /^[|>][+-]?$/.test(value)
+  // header allows indentation (1-9) and chomping (+/-) indicators in either order
+  return /^[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(value)
 }
 
 /**

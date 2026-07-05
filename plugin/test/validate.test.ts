@@ -84,7 +84,7 @@ description: 'Use for PDF files: reading, extracting.'`,
 test("block scalar content with colon-space passes", () => {
   withSkill(
     `name: pdf-reader
-description: |
+description: |2-
   Use for PDF files: reading, extracting.`,
     (skillPath) => {
       expect(validateSkill(skillPath)).toEqual({
