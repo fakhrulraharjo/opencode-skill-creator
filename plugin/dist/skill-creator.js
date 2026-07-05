@@ -12636,6 +12636,42 @@ function buildEvalWarnings(results) {
   const allZeroWithoutErrors = shouldTriggerResults.every((r) => r.triggers === 0 && r.errors === 0);
   return allZeroWithoutErrors ? [ALL_ZERO_WARNING] : [];
 }
+function findSkillConflicts(stdoutText, skillName) {
+  try {
+    const parsed = JSON.parse(stdoutText);
+    if (!Array.isArray(parsed))
+      return [];
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object")
+        return [];
+      const record2 = entry;
+      if (record2.name !== skillName)
+        return [];
+      return [
+        typeof record2.location === "string" && record2.location.trim() ? record2.location : "unknown location"
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+async function assertNoInstalledSkillConflict(skillName, projectRoot) {
+  let result;
+  try {
+    result = await runProcess(["opencode", "debug", "skill"], {
+      cwd: projectRoot,
+      timeoutMs: 1e4
+    });
+  } catch {
+    return;
+  }
+  if (isFailedProcess(result))
+    return;
+  const locations = findSkillConflicts(result.stdout, skillName);
+  if (locations.length === 0)
+    return;
+  throw new Error(`skill_eval conflict: skill "${skillName}" is already available to opencode at ${locations.join(", ")}. Remove that installed skill or its skills.paths entry before running skill_eval. The eval tool creates a synthetic skill named "${skillName}-skill-<id>" and only counts that temporary skill as triggered; an installed skill with the base name can steal triggers and produce false negatives.`);
+}
 function findProjectRoot(cwd) {
   let current = cwd ?? process.cwd();
   const { root } = parse5(current);
@@ -12730,7 +12766,7 @@ async function runSingleQuery(query, skillName, skillDescription, timeout, proje
       }
     });
     flushBuffer(true);
-    if (triggered) {
+    if (triggered && triggerOnly) {
       return true;
     }
     if (isFailedProcess(result)) {
@@ -14802,6 +14838,9 @@ function prepareReviewLaunch(args) {
     benchmarkPath: resolvedBenchmarkPath
   };
 }
+function normalizeDescriptionOverride(value) {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
 function getAutoUpdatePaths() {
   const cacheDir = process.env.XDG_CACHE_HOME || join10(homedir(), ".cache");
   const configDir = process.env.XDG_CONFIG_HOME || join10(homedir(), ".config");
@@ -15011,10 +15050,11 @@ var SkillCreatorPlugin = async (ctx) => {
           }
           const meta = parseSkillMd(args.skillPath);
           const projectRoot = findProjectRoot();
+          await assertNoInstalledSkillConflict(meta.name, projectRoot);
           const result = await runEval({
             evalSet,
             skillName: meta.name,
-            description: args.descriptionOverride ?? meta.description,
+            description: normalizeDescriptionOverride(args.descriptionOverride) ?? meta.description,
             numWorkers: args.numWorkers ?? 10,
             timeout: args.timeout ?? 30,
             projectRoot,
@@ -15076,10 +15116,13 @@ var SkillCreatorPlugin = async (ctx) => {
         async execute(args) {
           const { readFileSync: readFileSync8 } = await import("fs");
           const evalSet = JSON.parse(readFileSync8(args.evalSetPath, "utf-8"));
+          const meta = parseSkillMd(args.skillPath);
+          const projectRoot = findProjectRoot();
+          await assertNoInstalledSkillConflict(meta.name, projectRoot);
           const result = await runLoop({
             evalSet,
             skillPath: args.skillPath,
-            descriptionOverride: args.descriptionOverride ?? null,
+            descriptionOverride: normalizeDescriptionOverride(args.descriptionOverride) ?? null,
             numWorkers: args.numWorkers ?? 10,
             timeout: args.timeout ?? 30,
             maxIterations: args.maxIterations ?? 5,

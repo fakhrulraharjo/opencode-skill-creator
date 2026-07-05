@@ -1,6 +1,6 @@
 {
   "entrypoint": "skill-creator.ts",
   "runtimeEntrypoint": "runtime-entry.ts",
-  "sourceHash": "a95606cc6b846614df711940b5cae746a9ef7e2b27521082bd454fb2f8831ada",
-  "builtAt": "2026-07-05T23:25:34.085Z"
+  "sourceHash": "7ab254f2c22233b0ced8cc832878baacd73f3bd63fa45c81019e9149bf319605",
+  "builtAt": "2026-07-05T23:29:06.331Z"
 }

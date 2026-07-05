@@ -86,6 +86,53 @@ export function buildEvalWarnings(results: EvalResultItem[]): string[] {
   return allZeroWithoutErrors ? [ALL_ZERO_WARNING] : []
 }
 
+export function findSkillConflicts(
+  stdoutText: string,
+  skillName: string,
+): string[] {
+  try {
+    const parsed = JSON.parse(stdoutText) as unknown
+    if (!Array.isArray(parsed)) return []
+
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return []
+      const record = entry as Record<string, unknown>
+      if (record.name !== skillName) return []
+      return [
+        typeof record.location === "string" && record.location.trim()
+          ? record.location
+          : "unknown location",
+      ]
+    })
+  } catch {
+    return []
+  }
+}
+
+export async function assertNoInstalledSkillConflict(
+  skillName: string,
+  projectRoot: string,
+): Promise<void> {
+  let result
+  try {
+    result = await runProcess(["opencode", "debug", "skill"], {
+      cwd: projectRoot,
+      timeoutMs: 10_000,
+    })
+  } catch {
+    return
+  }
+
+  if (isFailedProcess(result)) return
+
+  const locations = findSkillConflicts(result.stdout, skillName)
+  if (locations.length === 0) return
+
+  throw new Error(
+    `skill_eval conflict: skill "${skillName}" is already available to opencode at ${locations.join(", ")}. Remove that installed skill or its skills.paths entry before running skill_eval. The eval tool creates a synthetic skill named "${skillName}-skill-<id>" and only counts that temporary skill as triggered; an installed skill with the base name can steal triggers and produce false negatives.`,
+  )
+}
+
 /**
  * Walk up from `cwd` looking for `.opencode/` or `.claude/` to find the
  * project root — mirrors how OpenCode discovers its project root.
@@ -208,7 +255,7 @@ async function runSingleQuery(
 
     flushBuffer(true)
 
-    if (triggered) {
+    if (triggered && triggerOnly) {
       return true
     }
 
