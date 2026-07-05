@@ -12392,7 +12392,7 @@ function validateSkill(skillPath) {
     if (kvMatch) {
       currentKey = kvMatch[1];
       const value = kvMatch[2].trim();
-      if (value && !isQuotedValue(value) && !isBlockScalarMarker(value) && (value.includes(": ") || value.endsWith(":"))) {
+      if (value && !isQuotedValue(value) && !isBlockScalarMarker(value) && (/:[ \t]/.test(value) || value.endsWith(":"))) {
         return {
           valid: false,
           message: `Invalid frontmatter value for '${currentKey}' on line ${index + 1}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`

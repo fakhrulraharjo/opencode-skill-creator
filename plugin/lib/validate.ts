@@ -90,7 +90,7 @@ export function validateSkill(skillPath: string): ValidationResult {
         value &&
         !isQuotedValue(value) &&
         !isBlockScalarMarker(value) &&
-        (value.includes(": ") || value.endsWith(":"))
+        (/:[ \t]/.test(value) || value.endsWith(":"))
       ) {
         return {
           valid: false,

@@ -136,6 +136,22 @@ description: Note: `,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("description")
+      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("Hint: quote the value")
+    },
+  )
+})
+
+test("unquoted value with colon-tab fails", () => {
+  withSkill(
+    `name: pdf-reader
+description: Use for PDF files:\treading`,
+    (skillPath) => {
+      const result = validateSkill(skillPath)
+
+      expect(result.valid).toBe(false)
+      expect(result.message).toContain("description")
+      expect(result.message).toContain("line 2")
     },
   )
 })
