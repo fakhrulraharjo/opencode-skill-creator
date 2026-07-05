@@ -301,6 +301,12 @@ Once installed, OpenCode will automatically detect the skill when you ask it to 
 
 OpenCode will load the opencode-skill-creator instructions and use the plugin tools to walk through the full workflow.
 
+## Examples
+
+The fastest way to see the workflow end to end: start with the [Docker Compose helper example](examples/docker-compose-helper/). It includes a small complete skill, a trigger eval set in the exact `skill_eval` JSON format, and copy-pasteable prompts for `skill_eval`, `skill_optimize_loop`, and benchmark review.
+
+Use it after install to see how description evals work before creating your own skill.
+
 ## Architecture
 
 This project has two components:
