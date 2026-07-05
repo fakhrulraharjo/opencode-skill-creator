@@ -23,6 +23,8 @@ const ALLOWED_PROPERTIES = new Set([
   "compatibility",
 ])
 
+// Intentionally simple first/last-char check — this validator is a lint
+// heuristic for common frontmatter mistakes, not a full YAML parser.
 function isQuotedValue(value: string): boolean {
   return (
     value.length >= 2 &&
@@ -94,7 +96,8 @@ export function validateSkill(skillPath: string): ValidationResult {
       ) {
         return {
           valid: false,
-          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 1}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`,
+          // +2: frontmatter starts on file line 2, after the opening ---
+          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 2}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`,
         }
       }
 

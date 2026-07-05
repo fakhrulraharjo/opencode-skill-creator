@@ -12395,7 +12395,7 @@ function validateSkill(skillPath) {
       if (value && !isQuotedValue(value) && !isBlockScalarMarker(value) && (/:[ \t]/.test(value) || value.endsWith(":"))) {
         return {
           valid: false,
-          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 1}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`
+          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 2}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`
         };
       }
       if (isBlockScalarMarker(value)) {

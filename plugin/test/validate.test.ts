@@ -59,7 +59,7 @@ description: Use for PDF files: reading, extracting.`,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("description")
-      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("line 3")
       expect(result.message).toContain("Hint: quote the value")
       expect(result.message).toContain("description: \"your text here\"")
       expect(result.message).toContain(
@@ -107,7 +107,7 @@ compatibility: Works with docs: markdown and PDF`,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("compatibility")
-      expect(result.message).toContain("line 3")
+      expect(result.message).toContain("line 4")
     },
   )
 })
@@ -121,13 +121,13 @@ description: Note:`,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("description")
-      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("line 3")
       expect(result.message).toContain("Hint: quote the value")
     },
   )
 })
 
-test("unquoted value ending with colon-space fails", () => {
+test("unquoted value with trailing colon-space fails after trim (ends-with-colon path)", () => {
   withSkill(
     `name: pdf-reader
 description: Note: `,
@@ -136,7 +136,7 @@ description: Note: `,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("description")
-      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("line 3")
       expect(result.message).toContain("Hint: quote the value")
     },
   )
@@ -151,7 +151,7 @@ description: Use for PDF files:\treading`,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("description")
-      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("line 3")
     },
   )
 })
@@ -165,7 +165,7 @@ description: Use when reading docs.`,
 
       expect(result.valid).toBe(false)
       expect(result.message).toContain("name")
-      expect(result.message).toContain("line 1")
+      expect(result.message).toContain("line 2")
       expect(result.message).toContain("Hint: quote the value")
     },
   )
