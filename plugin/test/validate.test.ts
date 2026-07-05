@@ -62,7 +62,9 @@ description: Use for PDF files: reading, extracting.`,
       expect(result.message).toContain("line 2")
       expect(result.message).toContain("Hint: quote the value")
       expect(result.message).toContain("description: \"your text here\"")
-      expect(result.message).toContain("unquoted values containing ': ' are invalid YAML")
+      expect(result.message).toContain(
+        "unquoted values containing ': ' or ending with ':' are invalid YAML",
+      )
       expect(result.message).toContain("runtime will drop this skill")
     },
   )
@@ -106,6 +108,34 @@ compatibility: Works with docs: markdown and PDF`,
       expect(result.valid).toBe(false)
       expect(result.message).toContain("compatibility")
       expect(result.message).toContain("line 3")
+    },
+  )
+})
+
+test("unquoted value ending with colon fails", () => {
+  withSkill(
+    `name: pdf-reader
+description: Note:`,
+    (skillPath) => {
+      const result = validateSkill(skillPath)
+
+      expect(result.valid).toBe(false)
+      expect(result.message).toContain("description")
+      expect(result.message).toContain("line 2")
+      expect(result.message).toContain("Hint: quote the value")
+    },
+  )
+})
+
+test("unquoted value ending with colon-space fails", () => {
+  withSkill(
+    `name: pdf-reader
+description: Note: `,
+    (skillPath) => {
+      const result = validateSkill(skillPath)
+
+      expect(result.valid).toBe(false)
+      expect(result.message).toContain("description")
     },
   )
 })
