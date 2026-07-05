@@ -23,6 +23,21 @@ const ALLOWED_PROPERTIES = new Set([
   "compatibility",
 ])
 
+// Intentionally simple first/last-char check — this validator is a lint
+// heuristic for common frontmatter mistakes, not a full YAML parser.
+function isQuotedValue(value: string): boolean {
+  return (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  )
+}
+
+function isBlockScalarMarker(value: string): boolean {
+  // header allows indentation (1-9) and chomping (+/-) indicators in either order
+  return /^[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(value)
+}
+
 /**
  * Validate a skill directory.
  *
@@ -56,7 +71,8 @@ export function validateSkill(skillPath: string): ValidationResult {
   let currentValue = ""
   let inMultiline = false
 
-  for (const line of frontmatterText.split("\n")) {
+  const frontmatterLines = frontmatterText.split("\n")
+  for (const [index, line] of frontmatterLines.entries()) {
     if (inMultiline) {
       if (line.startsWith("  ") || line.startsWith("\t")) {
         currentValue += " " + line.trim()
@@ -72,7 +88,20 @@ export function validateSkill(skillPath: string): ValidationResult {
       currentKey = kvMatch[1]
       const value = kvMatch[2].trim()
 
-      if ([">", "|", ">-", "|-"].includes(value)) {
+      if (
+        value &&
+        !isQuotedValue(value) &&
+        !isBlockScalarMarker(value) &&
+        (/:[ \t]/.test(value) || value.endsWith(":"))
+      ) {
+        return {
+          valid: false,
+          // +2: frontmatter starts on file line 2, after the opening ---
+          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 2}: unquoted values containing ': ' or ending with ':' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`,
+        }
+      }
+
+      if (isBlockScalarMarker(value)) {
         currentValue = ""
         inMultiline = true
       } else if (
