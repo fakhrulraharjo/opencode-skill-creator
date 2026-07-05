@@ -10746,7 +10746,7 @@ class JSONSchemaGenerator {
               if (val === undefined) {
                 if (this.unrepresentable === "throw") {
                   throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-                } else {}
+                }
               } else if (typeof val === "bigint") {
                 if (this.unrepresentable === "throw") {
                   throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -12352,6 +12352,12 @@ var ALLOWED_PROPERTIES = new Set([
   "metadata",
   "compatibility"
 ]);
+function isQuotedValue(value) {
+  return value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'");
+}
+function isBlockScalarMarker(value) {
+  return /^[|>][+-]?$/.test(value);
+}
 function validateSkill(skillPath) {
   const skillMdPath = join(skillPath, "SKILL.md");
   if (!existsSync(skillMdPath)) {
@@ -12370,8 +12376,9 @@ function validateSkill(skillPath) {
   let currentKey = "";
   let currentValue = "";
   let inMultiline = false;
-  for (const line of frontmatterText.split(`
-`)) {
+  const frontmatterLines = frontmatterText.split(`
+`);
+  for (const [index, line] of frontmatterLines.entries()) {
     if (inMultiline) {
       if (line.startsWith("  ") || line.startsWith("\t")) {
         currentValue += " " + line.trim();
@@ -12385,7 +12392,13 @@ function validateSkill(skillPath) {
     if (kvMatch) {
       currentKey = kvMatch[1];
       const value = kvMatch[2].trim();
-      if ([">", "|", ">-", "|-"].includes(value)) {
+      if (value && !isQuotedValue(value) && !isBlockScalarMarker(value) && value.includes(": ")) {
+        return {
+          valid: false,
+          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 1}: unquoted values containing ': ' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`
+        };
+      }
+      if (isBlockScalarMarker(value)) {
         currentValue = "";
         inMultiline = true;
       } else if (currentKey === "metadata" && (value === "" || value === "{}")) {

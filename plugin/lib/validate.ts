@@ -23,6 +23,17 @@ const ALLOWED_PROPERTIES = new Set([
   "compatibility",
 ])
 
+function isQuotedValue(value: string): boolean {
+  return (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  )
+}
+
+function isBlockScalarMarker(value: string): boolean {
+  return /^[|>][+-]?$/.test(value)
+}
+
 /**
  * Validate a skill directory.
  *
@@ -56,7 +67,8 @@ export function validateSkill(skillPath: string): ValidationResult {
   let currentValue = ""
   let inMultiline = false
 
-  for (const line of frontmatterText.split("\n")) {
+  const frontmatterLines = frontmatterText.split("\n")
+  for (const [index, line] of frontmatterLines.entries()) {
     if (inMultiline) {
       if (line.startsWith("  ") || line.startsWith("\t")) {
         currentValue += " " + line.trim()
@@ -72,7 +84,14 @@ export function validateSkill(skillPath: string): ValidationResult {
       currentKey = kvMatch[1]
       const value = kvMatch[2].trim()
 
-      if ([">", "|", ">-", "|-"].includes(value)) {
+      if (value && !isQuotedValue(value) && !isBlockScalarMarker(value) && value.includes(": ")) {
+        return {
+          valid: false,
+          message: `Invalid frontmatter value for '${currentKey}' on line ${index + 1}: unquoted values containing ': ' are invalid YAML and the runtime will drop this skill. Hint: quote the value (e.g. ${currentKey}: "your text here").`,
+        }
+      }
+
+      if (isBlockScalarMarker(value)) {
         currentValue = ""
         inMultiline = true
       } else if (
