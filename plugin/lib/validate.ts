@@ -25,8 +25,9 @@ const ALLOWED_PROPERTIES = new Set([
 
 function isQuotedValue(value: string): boolean {
   return (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
   )
 }
 

@@ -68,6 +68,33 @@ description: Use for PDF files: reading, extracting.`,
   )
 })
 
+test("single-quoted description containing colon-space passes", () => {
+  withSkill(
+    `name: pdf-reader
+description: 'Use for PDF files: reading, extracting.'`,
+    (skillPath) => {
+      expect(validateSkill(skillPath)).toEqual({
+        valid: true,
+        message: "Skill is valid!",
+      })
+    },
+  )
+})
+
+test("block scalar content with colon-space passes", () => {
+  withSkill(
+    `name: pdf-reader
+description: |
+  Use for PDF files: reading, extracting.`,
+    (skillPath) => {
+      expect(validateSkill(skillPath)).toEqual({
+        valid: true,
+        message: "Skill is valid!",
+      })
+    },
+  )
+})
+
 test("unquoted value with colon-space mid-value fails", () => {
   withSkill(
     `name: pdf-reader

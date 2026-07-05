@@ -12353,7 +12353,7 @@ var ALLOWED_PROPERTIES = new Set([
   "compatibility"
 ]);
 function isQuotedValue(value) {
-  return value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'");
+  return value.length >= 2 && (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'"));
 }
 function isBlockScalarMarker(value) {
   return /^[|>][+-]?$/.test(value);
