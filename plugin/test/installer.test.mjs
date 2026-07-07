@@ -46,8 +46,9 @@ function cachedPackagePath(home) {
     ".cache",
     "opencode",
     "packages",
-    "opencode-skill-creator@latest",
+    "@fakhrulraharjo/opencode-skill-creator@latest",
     "node_modules",
+    "@fakhrulraharjo",
     "opencode-skill-creator"
   )
 }
@@ -124,7 +125,7 @@ test("global install updates opencode.jsonc when it exists and preserves comment
     const updated = readFileSync(path, "utf-8")
     assert.match(updated, /\/\/ Keep this comment/)
     assert.match(updated, /"existing-plugin"/)
-    assert.match(updated, /"opencode-skill-creator"/)
+    assert.match(updated, /"@fakhrulraharjo\/opencode-skill-creator"/)
     assert.equal(existsSync(configPath(home, "opencode.json")), false)
   })
 })
@@ -148,7 +149,7 @@ test("global install creates plugin array in existing opencode.jsonc without plu
     assert.match(updated, /\/\/ Keep this comment/)
     assert.match(updated, /"model": "anthropic\/claude-sonnet-4-6"/)
     assert.match(updated, /"plugin": \[/)
-    assert.match(updated, /"opencode-skill-creator"/)
+    assert.match(updated, /"@fakhrulraharjo\/opencode-skill-creator"/)
     assert.equal(existsSync(configPath(home, "opencode.json")), false)
   })
 })
@@ -169,7 +170,7 @@ test("global install prefers opencode.jsonc when both opencode.jsonc and opencod
 
     await runInstaller(home)
 
-    assert.match(readFileSync(jsoncPath, "utf-8"), /"opencode-skill-creator"/)
+    assert.match(readFileSync(jsoncPath, "utf-8"), /"@fakhrulraharjo\/opencode-skill-creator"/)
     assert.equal(
       readFileSync(jsonPath, "utf-8"),
       `{
@@ -192,7 +193,7 @@ test("global install falls back to opencode.json when JSONC is absent", async ()
 
     const updated = readFileSync(jsonPath, "utf-8")
     assert.match(updated, /"json-plugin"/)
-    assert.match(updated, /"opencode-skill-creator"/)
+    assert.match(updated, /"@fakhrulraharjo\/opencode-skill-creator"/)
   })
 })
 
@@ -216,14 +217,14 @@ test("global install clears stale OpenCode package cache", async () => {
   await withHome(async (home) => {
     const path = configPath(home, "opencode.json")
     writeFileSync(path, `{
-  "plugin": ["opencode-skill-creator"]
+  "plugin": ["@fakhrulraharjo/opencode-skill-creator"]
 }
 `, "utf-8")
 
     const packagePath = cachedPackagePath(home)
     await mkdir(packagePath, { recursive: true })
     writeFileSync(join(packagePath, "package.json"), `{
-  "name": "opencode-skill-creator",
+  "name": "@fakhrulraharjo/opencode-skill-creator",
   "version": "0.2.11",
   "main": "./skill-creator.ts"
 }
@@ -247,7 +248,7 @@ test("global install continues when stale cache cleanup fails", async () => {
     const packagePath = cachedPackagePath(home)
     await mkdir(packagePath, { recursive: true })
     writeFileSync(join(packagePath, "package.json"), `{
-  "name": "opencode-skill-creator",
+  "name": "@fakhrulraharjo/opencode-skill-creator",
   "version": "0.2.11",
   "main": "./skill-creator.ts"
 }
@@ -264,15 +265,15 @@ test("global install continues when stale cache cleanup fails", async () => {
     }
 
     const updated = readFileSync(path, "utf-8")
-    assert.match(updated, /"opencode-skill-creator"/)
+    assert.match(updated, /"@fakhrulraharjo\/opencode-skill-creator"/)
   })
 })
 
-test("global install removes opencode-skill-creator plugin fault notifications", async () => {
+test("global install removes @fakhrulraharjo/opencode-skill-creator plugin fault notifications", async () => {
   await withHome(async (home) => {
     const path = configPath(home, "opencode.json")
     writeFileSync(path, `{
-  "plugin": ["opencode-skill-creator"]
+  "plugin": ["@fakhrulraharjo/opencode-skill-creator"]
 }
 `, "utf-8")
 
@@ -287,7 +288,7 @@ test("global install removes opencode-skill-creator plugin fault notifications",
           name: "UnknownError",
           data: {
             message:
-              "Failed to load plugin opencode-skill-creator: Stripping types is currently unsupported for files under node_modules",
+              "Failed to load plugin @fakhrulraharjo/opencode-skill-creator: Stripping types is currently unsupported for files under node_modules",
           },
         },
       },
@@ -328,7 +329,7 @@ test("global install removes opencode-skill-creator plugin fault notifications",
     assert.equal(notifications.length, 3)
     assert.equal(
       notifications.some((notification) =>
-        JSON.stringify(notification).includes("Failed to load plugin opencode-skill-creator:")
+        JSON.stringify(notification).includes("Failed to load plugin @fakhrulraharjo/opencode-skill-creator:")
       ),
       false
     )
@@ -344,7 +345,7 @@ test("global install removes opencode-skill-creator plugin fault notifications",
       ),
       true
     )
-    assert.match(result.stdout, /Removed 1 stale opencode-skill-creator plugin fault notification/)
+    assert.match(result.stdout, /Removed 1 stale @fakhrulraharjo\/opencode-skill-creator plugin fault notification/)
   })
 })
 
@@ -361,7 +362,7 @@ test("project install updates opencode.jsonc in the current directory", async ()
 
     const updated = readFileSync(path, "utf-8")
     assert.match(updated, /\/\/ project config/)
-    assert.match(updated, /"opencode-skill-creator"/)
+    assert.match(updated, /"@fakhrulraharjo\/opencode-skill-creator"/)
     assert.equal(existsSync(join(project, "opencode.json")), false)
   })
 })

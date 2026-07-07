@@ -6,7 +6,8 @@ import { homedir } from "os"
 import { join, dirname } from "path"
 
 const PKG_PATH = new URL("../package.json", import.meta.url)
-const PLUGIN_LOAD_ERROR_PREFIX = "Failed to load plugin opencode-skill-creator:"
+const PACKAGE_NAME = "@fakhrulraharjo/opencode-skill-creator"
+const PLUGIN_LOAD_ERROR_PREFIX = `Failed to load plugin ${PACKAGE_NAME}:`
 
 function getVersion() {
   try {
@@ -18,17 +19,17 @@ function getVersion() {
 }
 
 function printHelp() {
-  console.log(`opencode-skill-creator installer
+  console.log(`${PACKAGE_NAME} installer
 
 Links:
-  npm:  https://www.npmjs.com/package/opencode-skill-creator
-  repo: https://github.com/antongulin/opencode-skill-creator
+  npm:  https://www.npmjs.com/package/${PACKAGE_NAME}
+  repo: https://github.com/fakhrulraharjo/opencode-skill-creator
 
 Usage:
-  npx opencode-skill-creator install [--global|--project]
-  npx opencode-skill-creator [--global|--project]
-  npx opencode-skill-creator --version
-  npx opencode-skill-creator --about
+  npx ${PACKAGE_NAME} install [--global|--project]
+  npx ${PACKAGE_NAME} [--global|--project]
+  npx ${PACKAGE_NAME} --version
+  npx ${PACKAGE_NAME} --about
 
 Options:
   --global    Update ~/.config/opencode/opencode.jsonc if present, otherwise opencode.json (default)
@@ -40,9 +41,9 @@ Options:
 }
 
 function printAbout() {
-  console.log(`opencode-skill-creator ${getVersion()}
-npm:  https://www.npmjs.com/package/opencode-skill-creator
-repo: https://github.com/antongulin/opencode-skill-creator`)
+  console.log(`${PACKAGE_NAME} ${getVersion()}
+npm:  https://www.npmjs.com/package/${PACKAGE_NAME}
+repo: https://github.com/fakhrulraharjo/opencode-skill-creator`)
 }
 
 function parseArgs(argv) {
@@ -122,12 +123,12 @@ function clearStaleOpenCodePackageCache() {
     cacheDir,
     "opencode",
     "packages",
-    "opencode-skill-creator@latest"
+    `${PACKAGE_NAME}@latest`
   )
   const cachedPackageJson = join(
     packageCacheRoot,
     "node_modules",
-    "opencode-skill-creator",
+    ...PACKAGE_NAME.split("/"),
     "package.json"
   )
 
@@ -246,10 +247,10 @@ function saveConfig(path, raw, config) {
   }
 
   const edits = Array.isArray(config.plugin)
-    ? modify(raw, ["plugin", -1], "opencode-skill-creator", {
+    ? modify(raw, ["plugin", -1], PACKAGE_NAME, {
         formattingOptions,
       })
-    : modify(raw, ["plugin"], ["opencode-skill-creator"], {
+    : modify(raw, ["plugin"], [PACKAGE_NAME], {
         formattingOptions,
       })
 
@@ -266,7 +267,7 @@ function ensurePlugin(config) {
     throw new Error('Expected "plugin" to be an array in opencode config')
   }
 
-  return !config.plugin.includes("opencode-skill-creator")
+  return !config.plugin.includes(PACKAGE_NAME)
 }
 
 function main() {
@@ -292,16 +293,16 @@ function main() {
   if (changed) {
     saveConfig(configPath, raw, config)
     console.log(`Updated ${configPath}`)
-    console.log('Added "opencode-skill-creator" to the "plugin" array.')
+    console.log(`Added "${PACKAGE_NAME}" to the "plugin" array.`)
   } else {
     console.log(`No changes needed for ${configPath}`)
-    console.log('"opencode-skill-creator" is already in the "plugin" array.')
+    console.log(`"${PACKAGE_NAME}" is already in the "plugin" array.`)
   }
 
   if (global) {
     const cacheCleanup = clearStaleOpenCodePackageCache()
     if (cacheCleanup.cleared) {
-      console.log("Cleared stale OpenCode package cache for opencode-skill-creator.")
+      console.log(`Cleared stale OpenCode package cache for ${PACKAGE_NAME}.`)
     } else if (cacheCleanup.error) {
       console.warn(
         `Could not clear stale OpenCode package cache: ${cacheCleanup.error.message}`
@@ -314,7 +315,7 @@ function main() {
     if (removedNotifications > 0) {
       const noun = removedNotifications === 1 ? "notification" : "notifications"
       console.log(
-        `Removed ${removedNotifications} stale opencode-skill-creator plugin fault ${noun}.`
+        `Removed ${removedNotifications} stale ${PACKAGE_NAME} plugin fault ${noun}.`
       )
     }
   }
