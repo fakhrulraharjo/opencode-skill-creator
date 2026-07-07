@@ -496,6 +496,10 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
             .boolean()
             .optional()
             .describe("Stop each eval run as soon as the synthetic skill is triggered and ignore later workflow failures (default: true)"),
+          detectionMode: tool.schema
+            .enum(["tool-event", "marker-scan", "auto"])
+            .optional()
+            .describe("How to detect skill triggers. 'auto' (default) works with stock build agents AND routing agents like oh-my-openagent's Sisyphus. 'tool-event' is legacy behavior (only counts tool:\"skill\" and tool:\"read\" events). 'marker-scan' skips the tool-event allowlist and relies on marker matching in text/tool events plus raw stdout."),
           model: tool.schema
             .string()
             .optional()
@@ -530,6 +534,7 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
             runsPerQuery: args.runsPerQuery ?? 3,
             triggerThreshold: args.triggerThreshold ?? 0.5,
             triggerOnly: args.triggerOnly ?? true,
+            detectionMode: args.detectionMode ?? "auto",
             model: args.model,
             agent: args.agent ?? "build",
           })
@@ -632,6 +637,10 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
             .boolean()
             .optional()
             .describe("Stop each eval run as soon as the synthetic skill is triggered and ignore later workflow failures (default: true)"),
+          detectionMode: tool.schema
+            .enum(["tool-event", "marker-scan", "auto"])
+            .optional()
+            .describe("How to detect skill triggers. 'auto' (default) works with stock build agents AND routing agents like oh-my-openagent's Sisyphus. 'tool-event' is legacy behavior (only counts tool:\"skill\" and tool:\"read\" events). 'marker-scan' skips the tool-event allowlist and relies on marker matching in text/tool events plus raw stdout."),
           holdout: tool.schema
             .number()
             .optional()
@@ -672,6 +681,7 @@ export const SkillCreatorPlugin: Plugin = async (ctx) => {
             runsPerQuery: args.runsPerQuery ?? 3,
             triggerThreshold: args.triggerThreshold ?? 0.5,
             triggerOnly: args.triggerOnly ?? true,
+            detectionMode: args.detectionMode ?? "auto",
             holdout: args.holdout ?? 0.4,
             model: args.model,
             agent: args.agent ?? "build",

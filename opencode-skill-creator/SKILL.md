@@ -408,6 +408,16 @@ Use the model ID from your system prompt (the one powering the current session) 
 
 This handles the full optimization loop automatically. It splits the eval set into 60% train and 40% held-out test, evaluates the current description (running each query 3 times to get a reliable trigger rate), then calls OpenCode to propose improvements based on what failed. It re-evaluates each new description on both train and test, iterating up to 5 times. When it's done, it returns JSON with `best_description` — selected by test score rather than train score to avoid overfitting.
 
+#### Trigger detection modes (routing agents like oh-my-openagent)
+
+Both `skill_eval` and `skill_optimize_loop` accept an optional `detectionMode` argument that controls how a "trigger" is recognized in the eval subprocess:
+
+- **`auto`** (default) — Catches skill invocation across both stock OpenCode agents AND routing agents (oh-my-openagent's Sisyphus/hephaestus/prometheus, etc.). Matches `tool_use` events with any tool name, `text` events, and does a final raw-stdout marker check. Safe default — will never miss a real trigger and false positives are impossible because the synthetic skill name is randomly suffixed.
+- **`tool-event`** (legacy) — Only counts `tool:"skill"` or `tool:"read"` events. Use this if you specifically need to reproduce v0.2.x behavior or want to isolate whether the agent invoked the skill through the built-in skill tool dispatch.
+- **`marker-scan`** — Skips the tool allowlist entirely and relies on marker matching in every event plus raw stdout. Use this if `auto` is somehow still missing triggers in an exotic routing setup.
+
+You typically don't need to set this. If you're running under oh-my-openagent, the default `auto` mode already handles the case where worker agents absorb `available_skills` into their context and act via `read`/`bash`/`task` without emitting `tool:"skill"` events.
+
 ### How skill triggering works
 
 Understanding the triggering mechanism helps design better eval queries. Skills appear in OpenCode's `available_skills` list with their name + description, and OpenCode decides whether to consult a skill based on that description. The important thing to know is that OpenCode only consults skills for tasks it can't easily handle on its own — simple, one-step queries like "read this PDF" may not trigger a skill even if the description matches perfectly, because OpenCode can handle them directly with basic tools. Complex, multi-step, or specialized queries reliably trigger skills when the description matches.

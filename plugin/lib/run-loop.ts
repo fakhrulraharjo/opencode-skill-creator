@@ -17,7 +17,7 @@ import { buildEvalWarnings, findProjectRoot, runEval } from "./run-eval"
 import { improveDescription } from "./improve-description"
 import { generateHtml } from "./report"
 
-import type { EvalItem, EvalResultItem, EvalOutput } from "./run-eval"
+import type { DetectionMode, EvalItem, EvalResultItem, EvalOutput } from "./run-eval"
 import type { HistoryEntry } from "./improve-description"
 
 // ---------------------------------------------------------------------------
@@ -89,6 +89,7 @@ export interface RunLoopOptions {
   runsPerQuery: number
   triggerThreshold: number
   triggerOnly: boolean
+  detectionMode?: DetectionMode
   holdout: number
   model: string | undefined
   agent: string | undefined
@@ -144,6 +145,7 @@ export async function runLoop(opts: RunLoopOptions): Promise<RunLoopOutput> {
     runsPerQuery,
     triggerThreshold,
     triggerOnly,
+    detectionMode = "auto",
     holdout,
     model,
     agent,
@@ -196,6 +198,7 @@ export async function runLoop(opts: RunLoopOptions): Promise<RunLoopOutput> {
       runsPerQuery,
       triggerThreshold,
       triggerOnly,
+      detectionMode,
       model,
       agent,
     })

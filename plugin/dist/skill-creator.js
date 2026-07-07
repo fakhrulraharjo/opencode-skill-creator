@@ -10746,7 +10746,7 @@ class JSONSchemaGenerator {
               if (val === undefined) {
                 if (this.unrepresentable === "throw") {
                   throw new Error("Literal `undefined` cannot be represented in JSON Schema");
-                }
+                } else {}
               } else if (typeof val === "bigint") {
                 if (this.unrepresentable === "throw") {
                   throw new Error("BigInt literals cannot be represented in JSON Schema");
@@ -12614,7 +12614,7 @@ function runProcess(command, opts) {
 
 // lib/run-eval.ts
 var SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-var ALL_ZERO_WARNING = "All should-trigger queries produced 0 triggers with no run errors. Check that trigger evals are using an agent that exposes skill tool events, such as the build agent.";
+var ALL_ZERO_WARNING = "All should-trigger queries produced 0 triggers with no run errors. If you are using a routing agent (e.g. oh-my-openagent's Sisyphus) that does not emit skill tool events, set detectionMode: 'auto' or 'marker-scan' \u2014 the default 'auto' already tries both. Otherwise verify the eval set queries actually describe when this skill should trigger.";
 function buildOpenCodeRunCommand(query, opts) {
   const cmd = [
     "opencode",
@@ -12635,6 +12635,34 @@ function buildEvalWarnings(results) {
     return [];
   const allZeroWithoutErrors = shouldTriggerResults.every((r) => r.triggers === 0 && r.errors === 0);
   return allZeroWithoutErrors ? [ALL_ZERO_WARNING] : [];
+}
+function lineIndicatesTrigger(line, cleanName, mode) {
+  const trimmed = line.trim();
+  if (!trimmed)
+    return false;
+  let event;
+  try {
+    event = JSON.parse(trimmed);
+  } catch {
+    return false;
+  }
+  const eventType = typeof event.type === "string" ? event.type : "";
+  const part = event.part;
+  if (!part || typeof part !== "object")
+    return false;
+  const scanBroadEvents = mode !== "tool-event";
+  if (eventType === "tool_use") {
+    const toolName = typeof part.tool === "string" ? part.tool : "";
+    const inLegacyAllowlist = toolName === "skill" || toolName === "read";
+    if (!inLegacyAllowlist && !scanBroadEvents)
+      return false;
+    return JSON.stringify(part).includes(cleanName);
+  }
+  if (scanBroadEvents && eventType === "text") {
+    const text = typeof part.text === "string" ? part.text : "";
+    return text.includes(cleanName);
+  }
+  return false;
 }
 function findSkillConflicts(stdoutText, skillName) {
   try {
@@ -12687,7 +12715,7 @@ function findProjectRoot(cwd) {
   }
   return cwd ?? process.cwd();
 }
-async function runSingleQuery(query, skillName, skillDescription, timeout, projectRoot, agent, triggerOnly, model) {
+async function runSingleQuery(query, skillName, skillDescription, timeout, projectRoot, agent, triggerOnly, detectionMode, model) {
   if (!SKILL_NAME_RE.test(skillName)) {
     throw new Error(`Invalid skill name "${skillName}". Expected kebab-case (lowercase letters, numbers, and hyphens only).`);
   }
@@ -12720,24 +12748,9 @@ async function runSingleQuery(query, skillName, skillDescription, timeout, proje
     const maxStderrChars = 64 * 1024;
     const timeoutMs = timeout * 1000;
     const consumeLine = (line) => {
-      const trimmed = line.trim();
-      if (!trimmed)
-        return;
-      try {
-        const event = JSON.parse(trimmed);
-        if (event.type !== "tool_use")
-          return;
-        const part = event.part;
-        if (!part || typeof part !== "object")
-          return;
-        const toolName = typeof part.tool === "string" ? part.tool : "";
-        if (toolName !== "skill" && toolName !== "read")
-          return;
-        const serialized = JSON.stringify(part);
-        if (serialized.includes(cleanName)) {
-          triggered = true;
-        }
-      } catch {}
+      if (lineIndicatesTrigger(line, cleanName, detectionMode)) {
+        triggered = true;
+      }
     };
     const flushBuffer = (final = false) => {
       let newlineIndex = buffer.indexOf(`
@@ -12766,6 +12779,9 @@ async function runSingleQuery(query, skillName, skillDescription, timeout, proje
       }
     });
     flushBuffer(true);
+    if (!triggered && detectionMode !== "tool-event" && result.stdout.includes(cleanName)) {
+      triggered = true;
+    }
     if (triggered && triggerOnly) {
       return true;
     }
@@ -12791,6 +12807,7 @@ async function runEval(opts) {
     runsPerQuery = 3,
     triggerThreshold = 0.5,
     triggerOnly = true,
+    detectionMode = "auto",
     model,
     agent = "build"
   } = opts;
@@ -12808,7 +12825,7 @@ async function runEval(opts) {
       if (!job)
         break;
       try {
-        const triggered = await runSingleQuery(job.item.query, skillName, description, timeout, projectRoot, agent, triggerOnly, model);
+        const triggered = await runSingleQuery(job.item.query, skillName, description, timeout, projectRoot, agent, triggerOnly, detectionMode, model);
         jobResults.push({
           query: job.item.query,
           triggered,
@@ -13452,6 +13469,7 @@ async function runLoop(opts) {
     runsPerQuery,
     triggerThreshold,
     triggerOnly,
+    detectionMode = "auto",
     holdout,
     model,
     agent,
@@ -13495,6 +13513,7 @@ ${"=".repeat(60)}`);
       runsPerQuery,
       triggerThreshold,
       triggerOnly,
+      detectionMode,
       model,
       agent
     });
@@ -15038,6 +15057,7 @@ var SkillCreatorPlugin = async (ctx) => {
           runsPerQuery: tool.schema.number().optional().describe("Number of runs per query for reliability (default: 3)"),
           triggerThreshold: tool.schema.number().optional().describe("Trigger rate threshold to count as triggered (default: 0.5)"),
           triggerOnly: tool.schema.boolean().optional().describe("Stop each eval run as soon as the synthetic skill is triggered and ignore later workflow failures (default: true)"),
+          detectionMode: tool.schema.enum(["tool-event", "marker-scan", "auto"]).optional().describe(`How to detect skill triggers. 'auto' (default) works with stock build agents AND routing agents like oh-my-openagent's Sisyphus. 'tool-event' is legacy behavior (only counts tool:"skill" and tool:"read" events). 'marker-scan' skips the tool-event allowlist and relies on marker matching in text/tool events plus raw stdout.`),
           model: tool.schema.string().optional().describe("Model ID in provider/model format"),
           agent: tool.schema.string().optional().describe("OpenCode agent for trigger eval runs (default: build)")
         },
@@ -15061,6 +15081,7 @@ var SkillCreatorPlugin = async (ctx) => {
             runsPerQuery: args.runsPerQuery ?? 3,
             triggerThreshold: args.triggerThreshold ?? 0.5,
             triggerOnly: args.triggerOnly ?? true,
+            detectionMode: args.detectionMode ?? "auto",
             model: args.model,
             agent: args.agent ?? "build"
           });
@@ -15107,6 +15128,7 @@ var SkillCreatorPlugin = async (ctx) => {
           runsPerQuery: tool.schema.number().optional().describe("Runs per query (default: 3)"),
           triggerThreshold: tool.schema.number().optional().describe("Trigger rate threshold (default: 0.5)"),
           triggerOnly: tool.schema.boolean().optional().describe("Stop each eval run as soon as the synthetic skill is triggered and ignore later workflow failures (default: true)"),
+          detectionMode: tool.schema.enum(["tool-event", "marker-scan", "auto"]).optional().describe(`How to detect skill triggers. 'auto' (default) works with stock build agents AND routing agents like oh-my-openagent's Sisyphus. 'tool-event' is legacy behavior (only counts tool:"skill" and tool:"read" events). 'marker-scan' skips the tool-event allowlist and relies on marker matching in text/tool events plus raw stdout.`),
           holdout: tool.schema.number().optional().describe("Test set holdout fraction (default: 0.4)"),
           model: tool.schema.string().optional().describe("Model ID in provider/model format"),
           agent: tool.schema.string().optional().describe("OpenCode agent for trigger eval runs (default: build)"),
@@ -15129,6 +15151,7 @@ var SkillCreatorPlugin = async (ctx) => {
             runsPerQuery: args.runsPerQuery ?? 3,
             triggerThreshold: args.triggerThreshold ?? 0.5,
             triggerOnly: args.triggerOnly ?? true,
+            detectionMode: args.detectionMode ?? "auto",
             holdout: args.holdout ?? 0.4,
             model: args.model,
             agent: args.agent ?? "build",

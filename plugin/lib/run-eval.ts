@@ -27,6 +27,28 @@ export interface EvalItem {
   should_trigger: boolean
 }
 
+/**
+ * Trigger detection strategy.
+ *
+ * - "tool-event" (legacy): only counts `tool_use` events where `tool` is
+ *   "skill" or "read" and the serialized part contains the unique skill
+ *   name. Only works when the agent exposes skill tool events (e.g. the
+ *   stock `build` agent).
+ *
+ * - "marker-scan": scans every event and the raw stdout stream for the
+ *   unique skill name. Works with routing agents (e.g. oh-my-openagent's
+ *   Sisyphus/hephaestus) that absorb `available_skills` into their context
+ *   and act via `read`/`bash`/`task` without emitting `tool:"skill"`
+ *   events.
+ *
+ * - "auto" (default): combines both. Matches any `tool_use` event, any
+ *   `text` event, and does a final raw-stdout safety-net check. Backwards
+ *   compatible with the stock `build` agent (still catches skill/read
+ *   events) and works with oh-my-openagent routing (catches text
+ *   mentions and non-skill tool references).
+ */
+export type DetectionMode = "tool-event" | "marker-scan" | "auto"
+
 export interface EvalResultItem {
   query: string
   should_trigger: boolean
@@ -57,7 +79,7 @@ export interface EvalOutput {
 // ---------------------------------------------------------------------------
 
 const ALL_ZERO_WARNING =
-  "All should-trigger queries produced 0 triggers with no run errors. Check that trigger evals are using an agent that exposes skill tool events, such as the build agent."
+  "All should-trigger queries produced 0 triggers with no run errors. If you are using a routing agent (e.g. oh-my-openagent's Sisyphus) that does not emit skill tool events, set detectionMode: 'auto' or 'marker-scan' — the default 'auto' already tries both. Otherwise verify the eval set queries actually describe when this skill should trigger."
 
 export function buildOpenCodeRunCommand(
   query: string,
@@ -84,6 +106,42 @@ export function buildEvalWarnings(results: EvalResultItem[]): string[] {
     (r) => r.triggers === 0 && r.errors === 0,
   )
   return allZeroWithoutErrors ? [ALL_ZERO_WARNING] : []
+}
+
+export function lineIndicatesTrigger(
+  line: string,
+  cleanName: string,
+  mode: DetectionMode,
+): boolean {
+  const trimmed = line.trim()
+  if (!trimmed) return false
+
+  let event: Record<string, unknown>
+  try {
+    event = JSON.parse(trimmed) as Record<string, unknown>
+  } catch {
+    return false
+  }
+
+  const eventType = typeof event.type === "string" ? event.type : ""
+  const part = event.part as Record<string, unknown> | undefined
+  if (!part || typeof part !== "object") return false
+
+  const scanBroadEvents = mode !== "tool-event"
+
+  if (eventType === "tool_use") {
+    const toolName = typeof part.tool === "string" ? part.tool : ""
+    const inLegacyAllowlist = toolName === "skill" || toolName === "read"
+    if (!inLegacyAllowlist && !scanBroadEvents) return false
+    return JSON.stringify(part).includes(cleanName)
+  }
+
+  if (scanBroadEvents && eventType === "text") {
+    const text = typeof part.text === "string" ? part.text : ""
+    return text.includes(cleanName)
+  }
+
+  return false
 }
 
 export function findSkillConflicts(
@@ -163,6 +221,7 @@ async function runSingleQuery(
   projectRoot: string,
   agent: string,
   triggerOnly: boolean,
+  detectionMode: DetectionMode,
   model?: string,
 ): Promise<boolean> {
   if (!SKILL_NAME_RE.test(skillName)) {
@@ -179,7 +238,6 @@ async function runSingleQuery(
   try {
     mkdirSync(skillsDir, { recursive: true })
 
-    // Use YAML block scalar to avoid breaking on quotes in description
     const indentedDesc = skillDescription.split("\n").join("\n  ")
     const skillContent = [
       "---",
@@ -197,32 +255,14 @@ async function runSingleQuery(
 
     const cmd = buildOpenCodeRunCommand(query, { agent, model })
 
-    // Collect output with timeout and detect skill invocation from JSON events.
     let buffer = ""
     let triggered = false
     const maxStderrChars = 64 * 1024
     const timeoutMs = timeout * 1000
 
     const consumeLine = (line: string) => {
-      const trimmed = line.trim()
-      if (!trimmed) return
-
-      try {
-        const event = JSON.parse(trimmed) as Record<string, unknown>
-        if (event.type !== "tool_use") return
-
-        const part = event.part as Record<string, unknown> | undefined
-        if (!part || typeof part !== "object") return
-
-        const toolName = typeof part.tool === "string" ? part.tool : ""
-        if (toolName !== "skill" && toolName !== "read") return
-
-        const serialized = JSON.stringify(part)
-        if (serialized.includes(cleanName)) {
-          triggered = true
-        }
-      } catch {
-        // Ignore non-JSON lines and malformed events.
+      if (lineIndicatesTrigger(line, cleanName, detectionMode)) {
+        triggered = true
       }
     }
 
@@ -255,6 +295,14 @@ async function runSingleQuery(
 
     flushBuffer(true)
 
+    if (
+      !triggered &&
+      detectionMode !== "tool-event" &&
+      result.stdout.includes(cleanName)
+    ) {
+      triggered = true
+    }
+
     if (triggered && triggerOnly) {
       return true
     }
@@ -270,7 +318,6 @@ async function runSingleQuery(
 
     return triggered
   } finally {
-    // Clean up the temporary skill directory
     if (existsSync(skillsDir)) {
       rmSync(skillsDir, { recursive: true, force: true })
     }
@@ -291,6 +338,7 @@ export interface RunEvalOptions {
   runsPerQuery?: number
   triggerThreshold?: number
   triggerOnly?: boolean
+  detectionMode?: DetectionMode
   model?: string
   agent?: string
 }
@@ -312,6 +360,7 @@ export async function runEval(opts: RunEvalOptions): Promise<EvalOutput> {
     runsPerQuery = 3,
     triggerThreshold = 0.5,
     triggerOnly = true,
+    detectionMode = "auto",
     model,
     agent = "build",
   } = opts
@@ -347,6 +396,7 @@ export async function runEval(opts: RunEvalOptions): Promise<EvalOutput> {
           projectRoot,
           agent,
           triggerOnly,
+          detectionMode,
           model,
         )
         jobResults.push({
